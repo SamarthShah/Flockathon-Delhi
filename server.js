@@ -113,17 +113,22 @@ function analyseReceivedMessage(chatMessage, event, callback, showQuestion) {
                     });
                     res.on('end', function () {
                         //here we have the full response, html or json object
-                        console.log(JSON.parse(body).id);
+                        ticketNumber=JSON.parse(body).id;
+                        ticketKey=JSON.parse(body).key;
                         if (showQuestion) {
-                            botResponse = "Your Question: " + data._text + "\nResponse: I'm sorry I didn't understand. I have forwarded your request to support team and request id is: " + JSON.parse(body).id + ". One of them will get in touch with you.";
+                            botResponse = "Your Question: " + data._text + "\nResponse: I'm sorry I didn't understand. I have forwarded your request to support team and request id is: " + ticketNumber+ ". One of them will get in touch with you.";
                         }
                         else {
-                            botResponse = "I'm sorry I didn't understand. I have forwarded your request to support team and request id is: " + JSON.parse(body).id + ". One of them will get in touch with you.";
+                            botResponse = "I'm sorry I didn't understand. I have forwarded your request to support team and request id is: " + ticketNumber + ". One of them will get in touch with you.";
                         }
                         flock.chat.sendMessage(config.botToken, {
                             to: event.userId,
                             text: botResponse
                         });
+                        var newKey = firebase.database().ref().child(event.userId).push().key,
+                            ticketData = {};
+                        ticketData[event.userId + "/" + newKey] = { "request": data._text, "ticket_number": ticketNumber,"key": ticketKey};
+                        firebase.database().ref().update(ticketData);
                     })
                     res.on('error', function (e) {
                         console.log("Got error: " + e.message);
@@ -166,7 +171,16 @@ flock.events.on('client.messageAction', function (event, callback) {
 app.get('/list', function (req, res) {
     var event = JSON.parse(req.query.flockEvent);
     console.log(event);
-    res.send("SideBar");
+    dbRef.once("value").then(function (snapshot) {
+        ticketHistory = snapshot.val()[event.userId];
+        sidebarData=""
+        for (var key in ticketHistory) {
+            sidebarData+="<b><a href='https://helpie.atlassian.net/projects/HELPIE/issues/"+ticketHistory[key].key+"' target='_blank'>"+ticketHistory[key].ticket_number+"</a>:</b>"+ticketHistory[key].request+"</br>";
+        }
+
+        res.send(sidebarData);
+    });
+    
 });
 
 // Start the listener after reading the port from config
