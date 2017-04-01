@@ -19,7 +19,7 @@ app.post('/upload', function(req, res) {
   let excel = req.files.excel;
  
   // Use the mv() method to place the file somewhere on your server 
-  excel.mv('public/download/faqs.xlsx', function(err) {
+  excel.mv('public/temp/faqs.xlsx', function(err) {
     if (err)
       return res.status(500).send(err);
  
