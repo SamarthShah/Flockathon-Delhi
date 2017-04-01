@@ -9,6 +9,7 @@
   "author": "Samarth Shah and Ram Murat Sharma",
   "license": "ISC",
   "dependencies": {
+    "exceljs": "^0.4.2",
     "express": "^4.15.2",
     "firebase-admin": "^4.1.4",
     "flockos": "^0.0.6",
