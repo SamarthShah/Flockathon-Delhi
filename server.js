@@ -8,6 +8,7 @@ var Excel = require('exceljs');
 var filename = "faqs.xlsx";
 var serviceAccount = require("./firebase-key.json");
 var https = require('https');
+var _ = require("underscore");
 
 firebase.initializeApp({
     credential: firebase.credential.cert(serviceAccount),
@@ -15,13 +16,15 @@ firebase.initializeApp({
 });
 
 var database = firebase.database();
+var dbRef = database.ref();
+var answerList;
+
+dbRef.once("value").then(function (snapshot) {
+    answerList = snapshot.val().answers;
+});
 
 const client = new Wit({ accessToken: config.witToken });
-client.message('Hi', {})
-    .then((data) => {
-        console.log('Yay, got Wit.ai response: ' + JSON.stringify(data));
-    })
-    .catch(console.error);
+
 
 flock.appId = config.appId;
 flock.appSecret = config.appSecret;
@@ -49,19 +52,62 @@ flock.events.on('app.install', function (event, callback) {
 
 flock.events.on('client.slashCommand', function (event, callback) {
     console.log(event.text);
-    var testtext = event.text;
-    if (event.text != "samarth") {
-        flock.chat.sendMessage(config.botToken, {
-            to: event.userId,
-            text: "Ram"
-        });
-        firebase.database().ref('chatData/').set({
-            test: testtext
-        });
-        callback(null, { text: "Request Received" })
-    } else {
-        callback(null, { text: "Please provide more information" })
-    }
+    var chatMessage = event.text;
+    client.message(chatMessage, {})
+        .then((data) => {
+            //console.log('Yay, got Wit.ai response: ' + JSON.stringify(data));
+            //console.log(data.entities.intent);
+            if (data.entities.intent) {
+                //console.log(answerList);
+                answers = (_.find(answerList, { key: data.entities.intent[0].value }));
+                console.log(answers.answer);
+                flock.chat.sendMessage(config.botToken, {
+                    to: event.userId,
+                    text: "Your Question: " + data._text + "\nResponse: " + answers.answer
+                });
+
+            } else {
+                var requestData = "{\"fields\": {\"project\": { \"key\": \"HELPIE\"},\"summary\": \"" + data._text + "\",\"description\": \"Flockathon - Creating an issue via REST API\",\"issuetype\": {\"name\": \"Bug\"}}}";
+                // var requestData = '{"fields": {}}';
+                // requestData=JSON.stringify(requestData)
+                var options = {
+                    host: 'helpie.atlassian.net',
+                    port: 443,
+                    method: 'POST',
+                    path: '/rest/api/2/issue/',
+                    // authentication headers
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Basic ' + new Buffer('admin:Sapient@1234').toString('base64'),
+
+                    }
+                };
+                //this is the call
+                request = https.request(options, function (res) {
+                    var body = "";
+                    res.on('data', function (data) {
+                        body += data;
+                    });
+                    res.on('end', function () {
+                        //here we have the full response, html or json object
+                        console.log(JSON.parse(body).id);
+                        flock.chat.sendMessage(config.botToken, {
+                            to: event.userId,
+                            text: "Your Question: " + data._text + "\nResponse: I'm sorry I didn't understand. I have forwarded your request to support team and request id is: " + JSON.parse(body).id + ". One of them will get in touch with you."
+                        });
+                    })
+                    res.on('error', function (e) {
+                        console.log("Got error: " + e.message);
+                    });
+                });
+                request.write(requestData);
+                request.end();
+            }
+            callback(null, { text: "Request Received" })
+        })
+        .catch(console.error);
+
+
 });
 
 // delete tokens on app.uninstall
@@ -153,10 +199,10 @@ function exportQuestionsToWit(data) {
             "value": data.question,
             "expressions": [data.question]
         }],
-        "lookups" : ["trait"]
+        "lookups": ["trait"]
     };
-    requestData=JSON.stringify(requestData);
-    
+    requestData = JSON.stringify(requestData);
+
     var options = {
         host: 'api.wit.ai',
         method: 'POST',
