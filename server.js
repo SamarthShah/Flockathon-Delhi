@@ -161,18 +161,19 @@ function exportXLSToDatabase() {
     workbook.xlsx.readFile(filename)
         .then(function (data) {
 
-            var worksheet = data.getWorksheet(1);
+            var worksheet = data.getWorksheet(1),
+                witData = [];
             worksheet.eachRow(function (row, rowNumber) {
                 var _answerData = {}, _questionData = {};;
                 // Iterate over all non-null cells in a row 
                 row.eachCell(function (cell, colNumber) {
                     if (colNumber === 2) {
                         _answerData.key = cell.value;
-                        _questionData.key = cell.value;
+                        _questionData.value = cell.value;
                     } else if (colNumber === 4) {
                         _answerData.answer = cell.value;
                     } else if (colNumber === 3) {
-                        _questionData.question = cell.value;
+                        _questionData.expressions = [cell.value];
                     }
                 });
 
@@ -183,10 +184,12 @@ function exportXLSToDatabase() {
                     _newAnswer['/answers/' + _newPostKey] = _answerData;
                     firebase.database().ref().update(_newAnswer);
 
-                    //add data to wit 
-                    exportQuestionsToWit(_questionData);
+                    witData.push(_questionData);
                 }
             });
+
+            //add data to wit 
+            exportQuestionsToWit(witData);
 
         });
 }
@@ -194,19 +197,15 @@ function exportXLSToDatabase() {
 //import Soties/questions 
 function exportQuestionsToWit(data) {
     var requestData = {
-        "id": data.key,
-        "values": [{
-            "value": data.question,
-            "expressions": [data.question]
-        }],
-        "lookups": ["trait"]
+        "id": "intent",
+        "values": data
     };
     requestData = JSON.stringify(requestData);
 
     var options = {
         host: 'api.wit.ai',
-        method: 'POST',
-        path: '/entities',
+        method: 'PUT',
+        path: '/entities/intent',
         // authentication headers
         headers: {
             'Content-Type': 'application/json',
