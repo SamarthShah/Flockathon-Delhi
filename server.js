@@ -10,7 +10,6 @@ var serviceAccount = require("./firebase-key.json");
 var https = require('https');
 var http = require('http');
 var _ = require("underscore");
-var fileUpload = require('express-fileupload');
 var app = express();
 
 firebase.initializeApp({
@@ -38,25 +37,6 @@ app.use(express.static(config.nodeDir));
 
 app.use(flock.events.tokenVerifier);
 app.post('/events', flock.events.listener);
-
-// default options 
-app.use(fileUpload());
-
-app.post('/upload', function(req, res) {
-  if (!req.files)
-    return res.status(400).send('No files were uploaded.');
- 
-  // The name of the input field (i.e. "sampleFile") is used to retrieve the uploaded file 
-  let excel = req.files.excel;
- 
-  // Use the mv() method to place the file somewhere on your server 
-  excel.mv('public/temp/faqs.xlsx', function(err) {
-    if (err)
-      return res.status(500).send(err);
- 
-    res.send('File uploaded!');
-  });
-});
 
 // Read tokens from a local file, if possible.
 var tokens;
