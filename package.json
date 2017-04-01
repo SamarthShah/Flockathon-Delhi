@@ -1,0 +1,14 @@
+{
+  "name": "flockathon_delhi",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Samarth Shah and Ram Murat Sharma",
+  "license": "ISC",
+  "dependencies": {
+    "flockos": "0.0.6"
+  }
+}
