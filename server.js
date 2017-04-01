@@ -152,20 +152,19 @@ function exportQuestionsToWit(data) {
         "values": [{
             "value": data.question,
             "expressions": [data.question]
-        }]
+        }],
+        "lookups" : ["trait"]
     };
-    requestData=JSON.stringify(requestData)
+    requestData=JSON.stringify(requestData);
     
     var options = {
         host: 'api.wit.ai',
-        port: 443,
         method: 'POST',
-        path: '/entities/',
+        path: '/entities',
         // authentication headers
         headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + config.witToken,
-
         }
     };
     //this is the call
