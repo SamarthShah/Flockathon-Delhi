@@ -47,12 +47,26 @@ try {
 flock.events.on('app.install', function (event, callback) {
     tokens[event.userId] = event.token;
     console.log(tokens);
+    flock.chat.sendMessage(config.botToken, {
+        to: event.userId,
+        text: "Thanks for installing Helpie. You can ask any helpdesk related questions. For example:"
+    });
     callback();
 });
 
 flock.events.on('client.slashCommand', function (event, callback) {
     console.log(event.text);
     var chatMessage = event.text;
+    analyseReceivedMessage(chatMessage, event, callback, true);
+});
+
+flock.events.on('chat.receiveMessage', function (event, callback) {
+    console.log(event.message.text);
+    analyseReceivedMessage(event.message.text, event, callback, false);
+});
+
+function analyseReceivedMessage(chatMessage, event, callback, showQuestion) {
+
     client.message(chatMessage, {})
         .then((data) => {
             //console.log('Yay, got Wit.ai response: ' + JSON.stringify(data));
@@ -60,10 +74,16 @@ flock.events.on('client.slashCommand', function (event, callback) {
             if (data.entities.intent) {
                 //console.log(answerList);
                 answers = (_.find(answerList, { key: data.entities.intent[0].value }));
-                console.log(answers.answer);
+                //console.log(answers.answer);
+                if (showQuestion) {
+                    botResponse = "Your Question: " + data._text + "\nResponse: " + answers.answer;
+                }
+                else {
+                    botResponse = answers.answer;
+                }
                 flock.chat.sendMessage(config.botToken, {
                     to: event.userId,
-                    text: "Your Question: " + data._text + "\nResponse: " + answers.answer
+                    text: botResponse
                 });
 
             } else {
@@ -91,9 +111,15 @@ flock.events.on('client.slashCommand', function (event, callback) {
                     res.on('end', function () {
                         //here we have the full response, html or json object
                         console.log(JSON.parse(body).id);
+                        if (showQuestion) {
+                            botResponse = "Your Question: " + data._text + "\nResponse: I'm sorry I didn't understand. I have forwarded your request to support team and request id is: " + JSON.parse(body).id + ". One of them will get in touch with you.";
+                        }
+                        else {
+                            botResponse = "I'm sorry I didn't understand. I have forwarded your request to support team and request id is: " + JSON.parse(body).id + ". One of them will get in touch with you.";
+                        }
                         flock.chat.sendMessage(config.botToken, {
                             to: event.userId,
-                            text: "Your Question: " + data._text + "\nResponse: I'm sorry I didn't understand. I have forwarded your request to support team and request id is: " + JSON.parse(body).id + ". One of them will get in touch with you."
+                            text: botResponse
                         });
                     })
                     res.on('error', function (e) {
@@ -108,7 +134,8 @@ flock.events.on('client.slashCommand', function (event, callback) {
         .catch(console.error);
 
 
-});
+
+}
 
 // delete tokens on app.uninstall
 flock.events.on('app.uninstall', function (event) {
