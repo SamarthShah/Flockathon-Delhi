@@ -4,7 +4,8 @@ var express = require('express');
 var fs = require('fs');
 var firebase = require("firebase-admin");
 const {Wit, log} = require('node-wit');
-
+var Excel = require('exceljs');
+var filename = "faqs.xlsx";
 var serviceAccount = require("./firebase-key.json");
 
 firebase.initializeApp({
@@ -105,3 +106,39 @@ process.on('SIGTERM', process.exit);
 process.on('exit', function () {
     fs.writeFileSync('./tokens.json', JSON.stringify(tokens));
 });
+
+// read from a file 
+function exportXLSToDatabase(){
+    var workbook = new Excel.Workbook();
+    
+    workbook.xlsx.readFile(filename)
+        .then(function(data) {
+            
+            var worksheet = data.getWorksheet(1);
+            worksheet.eachRow(function(row, rowNumber) {
+                var _answerData = {};
+                    // Iterate over all non-null cells in a row 
+                    row.eachCell(function(cell, colNumber) {
+                        if(colNumber === 2 ){
+                          _answerData.key = cell.value;
+                        }else if(colNumber === 4 ){
+                          _answerData.answer = cell.value;
+                        }
+                    });
+
+                    if(rowNumber !==1 ){
+                        //add answer to firebase
+                        var _newPostKey = firebase.database().ref().child('answers').push().key,
+                            _newAnswer = {};
+                        _newAnswer['/answers/' + _newPostKey] = _answerData; 
+                        firebase.database().ref().update(_newAnswer);
+                    }
+            });
+
+        });
+}
+
+//read and update database
+if(config.exportXLS){
+    exportXLSToDatabase();
+}
