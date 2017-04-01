@@ -3,10 +3,11 @@ var config = require('./config.js');
 var express = require('express');
 var fs = require('fs');
 var firebase = require("firebase-admin");
-const {Wit, log} = require('node-wit');
+const { Wit, log } = require('node-wit');
 var Excel = require('exceljs');
 var filename = "faqs.xlsx";
 var serviceAccount = require("./firebase-key.json");
+var https = require('https');
 
 firebase.initializeApp({
     credential: firebase.credential.cert(serviceAccount),
@@ -108,37 +109,84 @@ process.on('exit', function () {
 });
 
 // read from a file 
-function exportXLSToDatabase(){
+function exportXLSToDatabase() {
     var workbook = new Excel.Workbook();
-    
-    workbook.xlsx.readFile(filename)
-        .then(function(data) {
-            
-            var worksheet = data.getWorksheet(1);
-            worksheet.eachRow(function(row, rowNumber) {
-                var _answerData = {};
-                    // Iterate over all non-null cells in a row 
-                    row.eachCell(function(cell, colNumber) {
-                        if(colNumber === 2 ){
-                          _answerData.key = cell.value;
-                        }else if(colNumber === 4 ){
-                          _answerData.answer = cell.value;
-                        }
-                    });
 
-                    if(rowNumber !==1 ){
-                        //add answer to firebase
-                        var _newPostKey = firebase.database().ref().child('answers').push().key,
-                            _newAnswer = {};
-                        _newAnswer['/answers/' + _newPostKey] = _answerData; 
-                        firebase.database().ref().update(_newAnswer);
+    workbook.xlsx.readFile(filename)
+        .then(function (data) {
+
+            var worksheet = data.getWorksheet(1);
+            worksheet.eachRow(function (row, rowNumber) {
+                var _answerData = {}, _questionData = {};;
+                // Iterate over all non-null cells in a row 
+                row.eachCell(function (cell, colNumber) {
+                    if (colNumber === 2) {
+                        _answerData.key = cell.value;
+                        _questionData.key = cell.value;
+                    } else if (colNumber === 4) {
+                        _answerData.answer = cell.value;
+                    } else if (colNumber === 3) {
+                        _questionData.question = cell.value;
                     }
+                });
+
+                if (rowNumber !== 1) {
+                    //add answer to firebase
+                    var _newPostKey = firebase.database().ref().child('answers').push().key,
+                        _newAnswer = {};
+                    _newAnswer['/answers/' + _newPostKey] = _answerData;
+                    firebase.database().ref().update(_newAnswer);
+
+                    //add data to wit 
+                    exportQuestionsToWit(_questionData);
+                }
             });
 
         });
 }
 
+//import Soties/questions 
+function exportQuestionsToWit(data) {
+    var requestData = {
+        "id": data.key,
+        "values": [{
+            "value": data.question,
+            "expressions": [data.question]
+        }]
+    };
+    requestData=JSON.stringify(requestData)
+    
+    var options = {
+        host: 'api.wit.ai',
+        port: 443,
+        method: 'POST',
+        path: '/entities/',
+        // authentication headers
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + config.witToken,
+
+        }
+    };
+    //this is the call
+    request = https.request(options, function (res) {
+        var body = "";
+        res.on('data', function (data) {
+            body += data;
+        });
+        res.on('end', function () {
+            //here we have the full response, html or json object
+            console.log(JSON.parse(body));
+        })
+        res.on('error', function (e) {
+            console.log("Got error: " + e.message);
+        });
+    });
+    request.write(requestData);
+    request.end();
+}
+
 //read and update database
-if(config.exportXLS){
+if (config.exportXLS) {
     exportXLSToDatabase();
 }
