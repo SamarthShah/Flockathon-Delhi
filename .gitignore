@@ -1,3 +1,5 @@
 node_modules/
 config.js
 firebase-key.json
+faqs.xlsx
+dummy-database-object.json
