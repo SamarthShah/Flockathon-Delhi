@@ -9,6 +9,7 @@
   "author": "Samarth Shah and Ram Murat Sharma",
   "license": "ISC",
   "dependencies": {
-    "flockos": "0.0.6"
-  }
+    "express": "^4.15.2",
+    "flockos": "^0.0.6"
+  },
 }
