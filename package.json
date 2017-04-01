@@ -11,5 +11,5 @@
   "dependencies": {
     "express": "^4.15.2",
     "flockos": "^0.0.6"
-  },
+  }
 }
