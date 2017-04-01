@@ -3,8 +3,8 @@ var config = require('./config.js');
 var express = require('express');
 var fs = require('fs');
 
-flock.setAppId(config.appId);
-flock.setAppSecret(config.appSecret);
+flock.appId = config.appId;
+flock.appSecret = config.appSecret;
 
 var app = express();
 
@@ -21,13 +21,54 @@ try {
 }
 
 // save tokens on app.install
-flock.events.on('app.install', function (event) {
+flock.events.on('app.install', function (event, callback) {
     tokens[event.userId] = event.token;
+    console.log(tokens);
+    callback();
+});
+
+flock.events.on('client.slashCommand', function (event, callback) {
+    console.log(event.text);
+    if (event.text != "samarth") {
+        flock.chat.sendMessage(config.botToken, {
+            to: event.userId,
+            text: "Ram"
+        });
+        callback(null, { text: "Request Received" })
+    } else {
+        callback(null, { text: "Please provide more information" })
+    }
 });
 
 // delete tokens on app.uninstall
 flock.events.on('app.uninstall', function (event) {
     delete tokens[event.userId];
+});
+
+flock.events.on('client.messageAction', function (event, callback) {
+    var messages = event.messages;
+    console.log(messages);
+    flock.chat.fetchMessages(tokens[event.userId], {
+        chat: event.chat,
+        uids: event.messageUids
+    }, function (error, messages) {
+        if (!error) {
+            flock.chat.sendMessage(config.botToken, {
+                to: event.userId,
+                text: messages[0].text
+            });
+        }
+        callback(null,{text:"Check message from bot"});
+    }
+    );
+
+
+});
+
+app.get('/list', function (req, res) {
+    var event = JSON.parse(req.query.flockEvent);
+    console.log(event);
+    res.send("SideBar");
 });
 
 // Start the listener after reading the port from config
