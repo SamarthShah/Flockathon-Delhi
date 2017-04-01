@@ -2,6 +2,24 @@ var flock = require('flockos');
 var config = require('./config.js');
 var express = require('express');
 var fs = require('fs');
+var firebase = require("firebase-admin");
+const {Wit, log} = require('node-wit');
+
+var serviceAccount = require("./firebase-key.json");
+
+firebase.initializeApp({
+    credential: firebase.credential.cert(serviceAccount),
+    databaseURL: "https://helpie-ba7c9.firebaseio.com"
+});
+
+var database = firebase.database();
+
+const client = new Wit({ accessToken: config.witToken });
+client.message('Hi', {})
+    .then((data) => {
+        console.log('Yay, got Wit.ai response: ' + JSON.stringify(data));
+    })
+    .catch(console.error);
 
 flock.appId = config.appId;
 flock.appSecret = config.appSecret;
@@ -29,10 +47,14 @@ flock.events.on('app.install', function (event, callback) {
 
 flock.events.on('client.slashCommand', function (event, callback) {
     console.log(event.text);
+    var testtext = event.text;
     if (event.text != "samarth") {
         flock.chat.sendMessage(config.botToken, {
             to: event.userId,
             text: "Ram"
+        });
+        firebase.database().ref('chatData/').set({
+            test: testtext
         });
         callback(null, { text: "Request Received" })
     } else {
@@ -58,7 +80,7 @@ flock.events.on('client.messageAction', function (event, callback) {
                 text: messages[0].text
             });
         }
-        callback(null,{text:"Check message from bot"});
+        callback(null, { text: "Check message from bot" });
     }
     );
 

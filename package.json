@@ -10,6 +10,8 @@
   "license": "ISC",
   "dependencies": {
     "express": "^4.15.2",
-    "flockos": "^0.0.6"
+    "firebase-admin": "^4.1.4",
+    "flockos": "^0.0.6",
+    "node-wit": "^4.2.0"
   }
 }
