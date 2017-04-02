@@ -206,7 +206,7 @@ function exportXLSToDatabase() {
             var worksheet = data.getWorksheet(1),
                 witData = [];
             worksheet.eachRow(function (row, rowNumber) {
-                var _answerData = {}, _questionData = {};;
+                var _answerData = {}, _questionData = {};
                 // Iterate over all non-null cells in a row 
                 row.eachCell(function (cell, colNumber) {
                     if (colNumber === 2) {
@@ -215,7 +215,8 @@ function exportXLSToDatabase() {
                     } else if (colNumber === 4) {
                         _answerData.answer = cell.value;
                     } else if (colNumber === 3) {
-                        _questionData.expressions = [cell.value];
+                        var _questions = cell.value;
+                        _questionData.expressions = _questions.split('\n');
                     }
                 });
 
