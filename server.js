@@ -11,6 +11,7 @@ var https = require('https');
 var http = require('http');
 var _ = require("underscore");
 var app = express();
+var request = require('request');
 
 firebase.initializeApp({
     credential: firebase.credential.cert(serviceAccount),
@@ -52,7 +53,7 @@ flock.events.on('app.install', function (event, callback) {
     console.log(tokens);
     flock.chat.sendMessage(config.botToken, {
         to: event.userId,
-        text: "Thanks for installing Helpie. You can ask any helpdesk related questions. For example:"
+        text: "Thanks for installing Helpie. You can ask any helpdesk related questions. For example: What is paternity leave policy? Does public holiday counts weekends? What are development urls? What are developers contact details? What kind of methods available? How to send chatbot message? "
     });
     callback();
 });
@@ -65,7 +66,32 @@ flock.events.on('client.slashCommand', function (event, callback) {
 
 flock.events.on('chat.receiveMessage', function (event, callback) {
     console.log(event.message.text);
-    analyseReceivedMessage(event.message.text, event, callback, false);
+    if (event.message.attachments) {
+
+        var download = function (url, dest, cb) {
+            var file = fs.createWriteStream(dest);
+            var request = https.get(url, function (response) {
+                response.pipe(file);
+                file.on('finish', function () {
+                    file.close(cb);  // close() is async, call cb after close completes.
+                });
+            }).on('error', function (err) { // Handle errors
+                fs.unlink(dest); // Delete the file async. (But we don't check the result)
+                if (cb) cb(err.message);
+            });
+        };
+
+        download(event.message.attachments[0].downloads[0].src, "public/temp/faqs.xlsx", function () {
+            exportXLSToDatabase();
+            flock.chat.sendMessage(config.botToken, {
+                to: event.userId,
+                text: "Thanks. I have received your request for updating helpdesk database. It will get updated in few minutes. You should be able to interact with new set of questions/queries in 5 minutes."
+            });
+        });
+    } else {
+        analyseReceivedMessage(event.message.text, event, callback, false);
+    }
+
 });
 
 function analyseReceivedMessage(chatMessage, event, callback, showQuestion) {
@@ -113,10 +139,10 @@ function analyseReceivedMessage(chatMessage, event, callback, showQuestion) {
                     });
                     res.on('end', function () {
                         //here we have the full response, html or json object
-                        ticketNumber=JSON.parse(body).id;
-                        ticketKey=JSON.parse(body).key;
+                        ticketNumber = JSON.parse(body).id;
+                        ticketKey = JSON.parse(body).key;
                         if (showQuestion) {
-                            botResponse = "Your Question: " + data._text + "\nResponse: I'm sorry I didn't understand. I have forwarded your request to support team and request id is: " + ticketNumber+ ". One of them will get in touch with you.";
+                            botResponse = "Your Question: " + data._text + "\nResponse: I'm sorry I didn't understand. I have forwarded your request to support team and request id is: " + ticketNumber + ". One of them will get in touch with you.";
                         }
                         else {
                             botResponse = "I'm sorry I didn't understand. I have forwarded your request to support team and request id is: " + ticketNumber + ". One of them will get in touch with you.";
@@ -127,7 +153,7 @@ function analyseReceivedMessage(chatMessage, event, callback, showQuestion) {
                         });
                         var newKey = firebase.database().ref().child(event.userId).push().key,
                             ticketData = {};
-                        ticketData[event.userId + "/" + newKey] = { "request": data._text, "ticket_number": ticketNumber,"key": ticketKey};
+                        ticketData[event.userId + "/" + newKey] = { "request": data._text, "ticket_number": ticketNumber, "key": ticketKey };
                         firebase.database().ref().update(ticketData);
                     })
                     res.on('error', function (e) {
@@ -156,10 +182,7 @@ flock.events.on('client.messageAction', function (event, callback) {
         uids: event.messageUids
     }, function (error, messages) {
         if (!error) {
-            flock.chat.sendMessage(config.botToken, {
-                to: event.userId,
-                text: messages[0].text
-            });
+            analyseReceivedMessage(messages[0].text, event, callback, true);
         }
         callback(null, { text: "Check message from bot" });
     }
@@ -173,14 +196,14 @@ app.get('/list', function (req, res) {
     console.log(event);
     dbRef.once("value").then(function (snapshot) {
         ticketHistory = snapshot.val()[event.userId];
-        sidebarData=""
+        sidebarData = ""
         for (var key in ticketHistory) {
-            sidebarData+="<b><a href='https://helpie.atlassian.net/projects/HELPIE/issues/"+ticketHistory[key].key+"' target='_blank'>"+ticketHistory[key].ticket_number+"</a>:</b>"+ticketHistory[key].request+"</br>";
+            sidebarData += "<b><a href='https://helpie.atlassian.net/projects/HELPIE/issues/" + ticketHistory[key].key + "' target='_blank'>" + ticketHistory[key].ticket_number + "</a>:</b>" + ticketHistory[key].request + "</br>";
         }
 
         res.send(sidebarData);
     });
-    
+
 });
 
 // Start the listener after reading the port from config
@@ -202,7 +225,8 @@ function exportXLSToDatabase() {
 
     workbook.xlsx.readFile(filename)
         .then(function (data) {
-
+            //remove old data
+            firebase.database().ref().child("answers").remove();
             var worksheet = data.getWorksheet(1),
                 witData = [];
             worksheet.eachRow(function (row, rowNumber) {
